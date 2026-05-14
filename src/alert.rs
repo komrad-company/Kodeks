@@ -14,7 +14,7 @@ pub(crate) mod writer;
 pub struct Alert {
     pub rule_id: String,
     pub title: String,
-    pub level: String,
+    pub level: RuleLevel,
     pub event: Value,
     pub timestamp_unix: u64,
 }
@@ -35,7 +35,7 @@ impl From<&Alert> for AlertRow {
             id: Uuid::new_v4(),
             rule_id: alert.rule_id.clone(),
             title: alert.title.clone(),
-            level: alert.level.clone(),
+            level: alert.level.to_string(),
             event: alert.event.clone(),
             triggered_at: DateTime::from_timestamp(alert.timestamp_unix as i64, 0)
                 .unwrap_or_else(Utc::now),
@@ -73,7 +73,7 @@ impl Alert {
         Self {
             rule_id,
             title,
-            level: level.to_string(),
+            level: level.clone(),
             event,
             timestamp_unix,
         }

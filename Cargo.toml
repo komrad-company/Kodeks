@@ -3,6 +3,12 @@ name = "kodeks"
 version = "0.1.0"
 edition = "2024"
 
+description = "Database model library for the Komrad ecosystem"
+license = "AGPL-3.0-or-later"
+readme = "README.md"
+
+repository = "https://github.com/komrad-company/Kodeks"
+
 [dependencies]
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }

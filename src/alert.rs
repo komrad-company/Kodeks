@@ -7,10 +7,17 @@ use uuid::Uuid;
 
 use khronika::warn;
 
+use crate::Error;
+
+pub(crate) mod query;
+pub(crate) mod reader;
 pub(crate) mod writer;
+
+pub use query::AlertQuery;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Alert {
+    pub uid: Option<Uuid>,
     pub rule_id: String,
     pub title: String,
     pub level: String,
@@ -20,12 +27,12 @@ pub struct Alert {
 
 #[derive(Debug, Clone, FromRow)]
 pub(crate) struct AlertRow {
-    pub(super) id: Uuid,
-    pub(super) rule_id: String,
-    pub(super) title: String,
-    pub(super) level: String,
-    pub(super) event: Value,
-    pub(super) triggered_at: DateTime<Utc>,
+    id: Uuid,
+    rule_id: String,
+    title: String,
+    level: String,
+    event: Value,
+    triggered_at: DateTime<Utc>,
 }
 
 impl From<&Alert> for AlertRow {
@@ -42,13 +49,30 @@ impl From<&Alert> for AlertRow {
     }
 }
 
+impl From<AlertRow> for Alert {
+    fn from(row: AlertRow) -> Self {
+        Self {
+            uid: Some(row.id),
+            rule_id: row.rule_id,
+            title: row.title,
+            level: row.level,
+            event: row.event,
+            timestamp_unix: row.triggered_at.timestamp().max(0) as u64,
+        }
+    }
+}
+
 impl Alert {
     pub fn new(rule_id: String, title: String, level: String, event: Value) -> Self {
         Self::new_at(rule_id, title, level, event, SystemTime::now())
     }
 
-    pub async fn write(&self, pool: &PgPool) -> Result<(), crate::Error> {
+    pub async fn write(&self, pool: &PgPool) -> Result<(), Error> {
         AlertRow::insert(pool, self).await
+    }
+
+    pub async fn get(pool: &PgPool, query: AlertQuery) -> Result<Vec<Self>, Error> {
+        AlertRow::get_alerts(pool, query).await
     }
 
     pub(crate) fn new_at(
@@ -59,17 +83,18 @@ impl Alert {
         time: SystemTime,
     ) -> Self {
         let timestamp_unix = match time.duration_since(UNIX_EPOCH) {
-            Ok(d) => d.as_secs(),
-            Err(e) => {
+            Ok(duration) => duration.as_secs(),
+            Err(error) => {
                 warn!(
                     rule_id = rule_id,
-                    "system clock is before UNIX_EPOCH ({e}), emitting alert with timestamp_unix=0"
+                    "system clock is before UNIX_EPOCH ({error}), emitting alert with timestamp_unix=0"
                 );
                 0
             }
         };
 
         Self {
+            uid: None,
             rule_id,
             title,
             level,

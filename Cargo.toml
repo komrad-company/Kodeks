@@ -21,7 +21,7 @@ sqlx = { version = "0.8", features = [
     "json",
     "migrate",
 ] }
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 khronika = { git = "https://github.com/komrad-company/Khronika.git", tag = "v0.1.0-rc1" }

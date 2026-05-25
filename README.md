@@ -9,6 +9,7 @@ Kodeks does not evaluate. Kodeks does not correlate. Kodeks **persists**. The de
 
 ```
 Alert ──write()──► PostgreSQL alerts table
+      ◄──get()──── PostgreSQL alerts table
 ```
 
 ---
@@ -16,24 +17,31 @@ Alert ──write()──► PostgreSQL alerts table
 ## Usage
 
 ```rust
-use kodeks::Alert;
+use kodeks::{Alert, AlertQuery};
 use serde_json::json;
 
+// Write
 let alert = Alert::new(
     "rule-001".to_string(),
     "Suspicious shell spawned".to_string(),
     "high".to_string(),
     json!({"process": "bash", "pid": 1234}),
 );
-
 alert.write(&pool).await?;
+
+// Read — last 100 alerts
+let alerts = Alert::get(&pool, AlertQuery { limit: Some(100), ..Default::default() }).await?;
+
+// Read — single alert by uid
+let alerts = Alert::get(&pool, AlertQuery { uid: Some(id), ..Default::default() }).await?;
 ```
 
 ### Public types
 
 | Type | Role |
 |---|---|
-| `Alert` | Domain alert — created by the correlator, persisted to PostgreSQL |
+| `Alert` | Domain alert — created by the correlator, persisted to and read from PostgreSQL |
+| `AlertQuery` | Read filter — `uid` for exact lookup, `limit` for bounded scan |
 | `Error` | Database errors — the caller must handle them |
 | `FromRow` | Re-exported from `sqlx` — implement on custom query result structs |
 
@@ -43,7 +51,7 @@ alert.write(&pool).await?;
 pub fn new(rule_id: String, title: String, level: String, event: Value) -> Self
 ```
 
-Constructs an alert stamped at the current system time.
+Constructs an alert stamped at the current system time. `uid` is `None` until the alert is read back from the database.
 
 ### `Alert::write`
 
@@ -52,6 +60,14 @@ pub async fn write(&self, pool: &PgPool) -> Result<(), Error>
 ```
 
 Persists the alert to the `alerts` table. The schema must exist — Kodeks does not run migrations.
+
+### `Alert::get`
+
+```rust
+pub async fn get(pool: &PgPool, query: AlertQuery) -> Result<Vec<Self>, Error>
+```
+
+Reads alerts from the `alerts` table. `AlertQuery::uid` returns at most one result; `AlertQuery::limit` bounds the scan. Both fields are optional — omitting both returns all rows.
 
 ---
 

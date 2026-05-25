@@ -16,13 +16,13 @@ Alert ──write()──► PostgreSQL alerts table
 ## Usage
 
 ```rust
-use kodeks::{Alert, RuleLevel};
+use kodeks::Alert;
 use serde_json::json;
 
 let alert = Alert::new(
     "rule-001".to_string(),
     "Suspicious shell spawned".to_string(),
-    &RuleLevel::High,
+    "high".to_string(),
     json!({"process": "bash", "pid": 1234}),
 );
 
@@ -34,14 +34,13 @@ alert.write(&pool).await?;
 | Type | Role |
 |---|---|
 | `Alert` | Domain alert — created by the correlator, persisted to PostgreSQL |
-| `RuleLevel` | Re-exported from Kompiler — severity level of the triggering rule |
 | `Error` | Database errors — the caller must handle them |
 | `FromRow` | Re-exported from `sqlx` — implement on custom query result structs |
 
 ### `Alert::new`
 
 ```rust
-pub fn new(rule_id: String, title: String, level: &RuleLevel, event: Value) -> Self
+pub fn new(rule_id: String, title: String, level: String, event: Value) -> Self
 ```
 
 Constructs an alert stamped at the current system time.

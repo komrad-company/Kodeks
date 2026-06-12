@@ -75,6 +75,10 @@ impl Alert {
         AlertRow::get_alerts(pool, query).await
     }
 
+    pub async fn count(pool: &PgPool) -> Result<i64, Error> {
+        AlertRow::count(pool).await
+    }
+
     pub(crate) fn new_at(
         rule_id: String,
         title: String,

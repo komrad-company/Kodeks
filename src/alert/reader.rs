@@ -14,18 +14,28 @@ impl AlertRow {
                     .await?
             }
             (None, Some(limit)) => {
-                sqlx::query_as::<_, AlertRow>("SELECT * FROM alerts LIMIT $1")
-                    .bind(limit)
-                    .fetch_all(pool)
-                    .await?
+                sqlx::query_as::<_, AlertRow>(
+                    "SELECT * FROM alerts ORDER BY triggered_at DESC LIMIT $1 OFFSET $2",
+                )
+                .bind(limit)
+                .bind(query.offset.unwrap_or(0))
+                .fetch_all(pool)
+                .await?
             }
             (None, None) => {
-                sqlx::query_as::<_, AlertRow>("SELECT * FROM alerts")
+                sqlx::query_as::<_, AlertRow>("SELECT * FROM alerts ORDER BY triggered_at DESC")
                     .fetch_all(pool)
                     .await?
             }
         };
 
         Ok(rows.into_iter().map(Alert::from).collect())
+    }
+
+    pub(crate) async fn count(pool: &PgPool) -> Result<i64, Error> {
+        let (total,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM alerts")
+            .fetch_one(pool)
+            .await?;
+        Ok(total)
     }
 }

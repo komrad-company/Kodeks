@@ -3,7 +3,7 @@
 > *"An alert that is not written is an attack that is not recorded."*
 > — Komrad Engineering Collective, May 2026
 
-Kodeks is the database model library of the Komrad ecosystem. It defines the canonical `Alert` type and its persistence logic against PostgreSQL. Consumed by [Korelator](https://github.com/komrad-company/Korelator) — any component that must persist structured alert data goes through Kodeks.
+Kodeks is the database model library of the Komrad ecosystem. It defines the canonical `Alert` type and its persistence logic against PostgreSQL. [Korelator](https://github.com/komrad-company/Korelator) writes alerts through it; [Kontrol-api](https://github.com/komrad-company/Kontrol-api) reads them back for triage. Any component that touches structured alert data goes through Kodeks.
 
 Kodeks does not evaluate. Kodeks does not correlate. Kodeks **persists**. The detection logic belongs to the consumer.
 
@@ -29,8 +29,13 @@ let alert = Alert::new(
 );
 alert.write(&pool).await?;
 
-// Read — last 100 alerts
-let alerts = Alert::get(&pool, AlertQuery { limit: Some(100), ..Default::default() }).await?;
+// Read — second page of 20, most recent first
+let alerts = Alert::get(
+    &pool,
+    AlertQuery { limit: Some(20), offset: Some(20), ..Default::default() },
+)
+.await?;
+let total = Alert::count(&pool).await?;
 
 // Read — single alert by uid
 let alerts = Alert::get(&pool, AlertQuery { uid: Some(id), ..Default::default() }).await?;
@@ -41,7 +46,7 @@ let alerts = Alert::get(&pool, AlertQuery { uid: Some(id), ..Default::default() 
 | Type | Role |
 |---|---|
 | `Alert` | Domain alert — created by the correlator, persisted to and read from PostgreSQL |
-| `AlertQuery` | Read filter — `uid` for exact lookup, `limit` for bounded scan |
+| `AlertQuery` | Read filter — `uid` for exact lookup, `limit` + `offset` for paginated scan |
 | `Error` | Database errors — the caller must handle them |
 | `FromRow` | Re-exported from `sqlx` — implement on custom query result structs |
 
@@ -67,7 +72,15 @@ Persists the alert to the `alerts` table. The schema must exist — Kodeks does 
 pub async fn get(pool: &PgPool, query: AlertQuery) -> Result<Vec<Self>, Error>
 ```
 
-Reads alerts from the `alerts` table. `AlertQuery::uid` returns at most one result; `AlertQuery::limit` bounds the scan. Both fields are optional — omitting both returns all rows.
+Reads alerts from the `alerts` table, ordered by `triggered_at` descending. `AlertQuery::uid` returns at most one result and takes precedence; otherwise `AlertQuery::limit` bounds the scan and `AlertQuery::offset` skips rows (pagination). All fields are optional — omitting them all returns every row.
+
+### `Alert::count`
+
+```rust
+pub async fn count(pool: &PgPool) -> Result<i64, Error>
+```
+
+Returns the total number of rows in the `alerts` table. Pairs with `Alert::get` for paginated reads.
 
 ---
 
@@ -79,8 +92,7 @@ Reads alerts from the `alerts` table. `AlertQuery::uid` returns at most one resu
 | `serde` + `serde_json` | Serialization and JSON event storage |
 | `uuid` | Alert identifier generation |
 | `chrono` | Timestamp handling |
-| `kompiler` | `RuleLevel` type for alert severity |
-| `khronika` | Structured logging |
+| `khronika` | Structured logging — built by the collective |
 | `thiserror` | Error type derivation |
 
 ---
